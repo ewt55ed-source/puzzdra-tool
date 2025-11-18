@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>パズドラ風ツール</title>
+<style>
+  body { font-family: sans-serif; padding: 10px; }
+  #controls { margin-bottom: 10px; }
+  #board { display: grid; gap: 2px; }
+  .cell { width: 50px; height: 50px; background: #eee; display: flex; justify-content: center; align-items: center; cursor: pointer; }
+  .cell img { width: 48px; height: 48px; }
+  button { margin-right: 5px; }
+</style>
+</head>
+<body>
+
+<div id="controls">
+  <label>盤面列: <input type="number" id="rows" value="5" min="1"></label>
+  <label>盤面行: <input type="number" id="cols" value="6" min="1"></label>
+  <button id="generateBtn">生成</button>
+  <button id="toggleModeBtn">モード切替（編集）</button>
+  <label>落ちコン: <input type="checkbox" id="comboCheck" checked></label>
+  <span>コンボ数: <span id="comboCount">0</span></span>
+  <span>タイマー: <span id="timer">0</span>s</span>
+</div>
+
+<div id="board"></div>
+
+<script>
+const dropImages = {
+  fire:"fire.png",
+  water:"water.png",
+  wood:"wood.png",
+  light:"light.png",
+  dark:"dark.png",
+  heal:"heal.png"
+};
+let mode = 'edit'; // edit or play
+let board = [];
+let rows = 5, cols = 6;
+let dragStart = null;
+let timerInterval = null;
+let timerValue = 0;
+
+const boardEl = document.getElementById('board');
+const comboEl = document.getElementById('comboCount');
+const timerEl = document.getElementById('timer');
+
+function initBoard() {
+  rows = parseInt(document.getElementById('rows').value);
+  cols = parseInt(document.getElementById('cols').value);
+  board = [];
+  boardEl.style.gridTemplateColumns = `repeat(${cols}, 50px)`;
+  boardEl.innerHTML = '';
+  for(let r=0;r<rows;r++){
+    board[r] = [];
+    for(let c=0;c<cols;c++){
+      const cell = document.createElement('div');
+      cell.className='cell';
+      const img = document.createElement('img');
+      img.src = dropImages.fire;
+      cell.appendChild(img);
+      cell.dataset.row=r;
+      cell.dataset.col=c;
+      cell.addEventListener('click', onCellClick);
+      cell.addEventListener('mousedown', onDragStart);
+      cell.addEventListener('mouseup', onDragEnd);
+      boardEl.appendChild(cell);
+      board[r][c]='fire';
+    }
+  }
+  resetTimer();
+}
+
+function onCellClick(e){
+  if(mode!=='edit') return;
+  const r = parseInt(e.currentTarget.dataset.row);
+  const c = parseInt(e.currentTarget.dataset.col);
+  const keys = Object.keys(dropImages);
+  let index = keys.indexOf(board[r][c]);
+  index = (index+1)%keys.length;
+  board[r][c]=keys[index];
+  e.currentTarget.firstChild.src=dropImages[board[r][c]];
+}
+
+function onDragStart(e){
+  if(mode!=='play') return;
+  dragStart = e.currentTarget;
+}
+
+function onDragEnd(e){
+  if(mode!=='play' || !dragStart) return;
+  const startR = parseInt(dragStart.dataset.row);
+  const startC = parseInt(dragStart.dataset.col);
+  const endR = parseInt(e.currentTarget.dataset.row);
+  const endC = parseInt(e.currentTarget.dataset.col);
+  // swap
+  const temp = board[startR][startC];
+  board[startR][startC]=board[endR][endC];
+  board[endR][endC]=temp;
+  dragStart.firstChild.src=dropImages[board[startR][startC]];
+  e.currentTarget.firstChild.src=dropImages[board[endR][endC]];
+  dragStart=null;
+  if(document.getElementById('comboCheck').checked){
+    calculateCombos();
+  }
+}
+
+function calculateCombos(){
+  // 超簡易：横に3以上同じで1コンボとしてカウント
+  let combo=0;
+  for(let r=0;r<rows;r++){
+    let count=1;
+    for(let c=1;c<cols;c++){
+      if(board[r][c]===board[r][c-1]) count++;
+      else {if(count>=3) combo++; count=1;}
+    }
+    if(count>=3) combo++;
+  }
+  for(let c=0;c<cols;c++){
+    let count=1;
+    for(let r=1;r<rows;r++){
+      if(board[r][c]===board[r-1][c]) count++;
+      else {if(count>=3) combo++; count=1;}
+    }
+    if(count>=3) combo++;
+  }
+  comboEl.textContent=combo;
+}
+
+function generateRandomBoard(){
+  const keys = Object.keys(dropImages);
+  for(let r=0;r<rows;r++){
+    for(let c=0;c<cols;c++){
+      const rand = keys[Math.floor(Math.random()*keys.length)];
+      board[r][c]=rand;
+      boardEl.children[r*cols+c].firstChild.src=dropImages[rand];
+    }
+  }
+  calculateCombos();
+}
+
+function toggleMode(){
+  mode = (mode==='edit')?'play':'edit';
+  document.getElementById('toggleModeBtn').textContent=`モード切替（${mode}）`;
+}
+
+function resetTimer(){
+  clearInterval(timerInterval);
+  timerValue=0;
+  timerEl.textContent='0';
+  timerInterval=setInterval(()=>{
+    timerValue++;
+    timerEl.textContent=timerValue;
+  },1000);
+}
+
+// イベント
+document.getElementById('generateBtn').addEventListener('click',generateRandomBoard);
+document.getElementById('toggleModeBtn').addEventListener('click',toggleMode);
+
+// 初期化
+initBoard();
+</script>
+
+</body>
+</html>
